@@ -1,7 +1,9 @@
 from flask import Flask, Blueprint, request, jsonify, make_response
 from flask_restful import abort
-from project.models import Item, item_schema, items_schema
+from project.models import Item, item_schema, items_schema, Activity
 from project import db, app
+import pandas as pd
+from datetime import datetime
 
 item = Blueprint('item', '__name__')
 
@@ -10,7 +12,10 @@ item = Blueprint('item', '__name__')
 def all_item():
     all_item = Item.query.all()
     result = items_schema.dump(all_item)
-    return jsonify({'data': result})
+    data = pd.DataFrame(result)
+    data["price"]= data["price"].apply(lambda x: round(float(x),2))
+    data["label"] = data["name"] + " RM" + data["price"].astype(str) 
+    return (data.to_json(orient='records'))
 
 # Get Single item
 @item.route("/<id>", methods=['GET'])
@@ -61,18 +66,34 @@ def add_items():
 # DELETE item
 @item.route("/<id>", methods=["DELETE"])
 def delete_item(id):
+    name= Item.query.filter_by(id=id).first()
+    # name=name.name
     remark = Item.query.filter_by(id=id).delete()
     db.session.commit()
 
-    return jsonify({"Item has been deleted"}), 204
+    my_date = datetime.now()
+    ###
+    new_activity=Activity(activity_dt=my_date,activity="Delete item",act_description="Deleted item")
+    db.session.add(new_activity)
+    db.session.commit()
+    
+    return jsonify({"message":"Item has been deleted"}), 204
 
 # update Item
 @item.route("/<id>", methods=["PUT"])
 def update_item(id):
-    item = Item.query.get(id)
     item_new = request.get_json()
-    item = item_new
+    item = Item.query.filter(Item.id==id).update(item_new)
     result = item_schema.dump(item)
     db.session.commit()
+
+    name= Item.query.filter_by(id=id).first()
+    # name=name.name
+    my_date = datetime.now()
+    ###
+    new_activity=Activity(activity_dt=my_date,activity="Update item",act_description="Updated item")
+    db.session.add(new_activity)
+    db.session.commit()
+
     return jsonify({'message': "Updated",
                     'data': result})

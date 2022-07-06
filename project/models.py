@@ -35,10 +35,10 @@ class InvoiceItem(db.Model):
     quantity= db.Column(db.Numeric(5000))
     invoice = db.relationship("Invoice", backref="invoice_item")
     item = db.relationship("Item", backref="invoice_item")
-
+    total_price = db.Column(db.Numeric(5000))
 class InvoiceItemSchema(ma.Schema):
     class Meta:
-        fields=('invoice_id','item_id','quantity')
+        fields=('invoice_id','item_id','quantity','total_price')
 
 invoice_item_schema=InvoiceItemSchema()
 invoice_items_schema=InvoiceItemSchema(many=True)
@@ -49,20 +49,21 @@ class Invoice(db.Model):
     sub_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     remark= db.Column(db.String(500),nullable=True)
     company_id=db.Column(db.String(100),db.ForeignKey('company.id'),nullable=False)
-    company = db.relationship('Company', backref='invoice')
+    company = db.relationship('Company', backref=backref("invoice", cascade="all, delete-orphan"))
 
     item=db.relationship('Item',secondary='invoice_item')
-
-    def __init__ (self,id,sub_date,company_id,remark):
+    total=db.Column(db.Numeric(5000))
+    def __init__ (self,id,sub_date,company_id,remark,total):
         self.id=id
         self.sub_date=sub_date
         self.company_id=company_id
         self.remark=remark
+        self.total=total
 
 #Invoice schema
 class InvoiceSchema(ma.Schema):
     class Meta:
-        fields=('id','sub_date','company_id')
+        fields=('id','sub_date','company_id','total')
 
 #initialize schema
 invoice_schema=InvoiceSchema()
@@ -92,22 +93,17 @@ items_schema=ItemSchema(many=True)
 class Activity(db.Model):
     id=db.Column(db.Integer,primary_key=True)
     activity_dt = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    invoice_id=db.Column(db.String(100),db.ForeignKey('invoice.id'),nullable=False)
     activity=db.Column(db.String(500))
     act_description=db.Column(db.String(1000))
-   
-    #relationships:
-    invoice = db.relationship('Invoice', backref='activity')
-    
-    def __init__(self,activity_dt,invoice_id,activity,act_description):
+
+    def __init__(self,activity_dt,activity,act_description):
         self.activity_dt=activity_dt
-        self.invoice_id=invoice_id
         self.activity=activity
         self.act_description=act_description
        
 class ActivitySchema(ma.Schema):
     class Meta:
-        fields=('id','activity_dt','invoice_id','activity','act_description')
+        fields=('id','activity_dt','activity','act_description')
 
 activity_schema=ActivitySchema()
 activitys_schema=ActivitySchema(many=True)        
@@ -136,7 +132,8 @@ class Summary2Schema(ma.Schema):
                   'address',
                   'phone',
                   'fax',
-                  'name'
+                  'name',
+                  'remark'
         )
 summary2_schema = Summary2Schema()
 summarys2_schema = Summary2Schema(many=True)

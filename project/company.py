@@ -1,7 +1,8 @@
 from flask import Flask, Blueprint, request, jsonify, make_response
 from flask_restful import abort
-from project.models import Company, company_schema, companys_schema
+from project.models import Company, company_schema, companys_schema, Activity
 from project import db, app
+from datetime import datetime
 
 company = Blueprint('company', '__name__')
 
@@ -19,7 +20,7 @@ def all_company():
 
 @company.route("/<id>", methods=['GET'])
 def get_company(id):
-    Company = Company.query.filter_by(id=id).first()
+    company = Company.query.filter_by(id=id).first()
     result = company_schema.dump(company)
     if not result:
         abort(404, message="Could not find Company with this ID")
@@ -46,6 +47,11 @@ def add_company():
         db.session.add(new_company)
         db.session.commit()
 
+    my_date = datetime.now()
+    new_activity=Activity(activity_dt=my_date,activity="Add New company",act_description="Added "+ name)
+    db.session.add(new_activity)
+    db.session.commit()
+
     return jsonify({
         'message': "Company Created",
         'new_user': {
@@ -57,18 +63,32 @@ def add_company():
 # DELETE Company
 @company.route("/<id>", methods=["DELETE"])
 def delete_company(id):
+    name= Company.query.filter_by(id=id).first()
+    name=name.name
     remark = Company.query.filter_by(id=id).delete()
     db.session.commit()
 
-    return jsonify({"Company has been deleted"}), 204
+    my_date = datetime.now()
+    new_activity=Activity(activity_dt=my_date,activity="Delete company",act_description="Deleted "+ name)
+    db.session.add(new_activity)
+    db.session.commit()
+
+    return jsonify({'message':"Company has been deleted"}), 204
 
 # update Company
 @company.route("/<id>", methods=["PUT"])
 def update_company(id):
-    comp = Company.query.get(id)
     comp_new = request.get_json()
-    comp = comp_new
-    result = company_schema.dump(comp)
+    comp = Company.query.filter(Company.id==id).update(comp_new)
+    result = company_schema.dump(comp_new)
     db.session.commit()
+
+    name= Company.query.filter_by(id=id).first()
+    name=name.name
+    my_date = datetime.now()
+    new_activity=Activity(activity_dt=my_date,activity="Update company",act_description="Updated "+ name)
+    db.session.add(new_activity)
+    db.session.commit()
+
     return jsonify({'message': "Updated",
                     'data': result})
